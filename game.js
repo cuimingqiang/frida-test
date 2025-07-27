@@ -503,22 +503,23 @@ function hookJNIMethod(method_name) {
     Interceptor.attach(func_addr, {
         onEnter: function(args) {
             console.log(`\n[JNIEnv] 调用: ${method_name}`);
-            console.log(`  参数: ${args[1].readCString()}`); // 假设第一个参数是字符串
-            // 打印调用栈
+            if(method_name === "NewStringUTF") {
+                console.log(`  参数: ${args[1].readCString()}`); // 假设第一个参数是字符串
+            }
             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
                 .map(DebugSymbol.fromAddress)
             console.log(`调用栈:\n${stack}`);
         },
         onLeave: function(retval) {
             if(method_name === "GetStringUTFChars") {
-                console.log(`[JNIEnv] GetStringUTFChars 返回: ${retval.readCString()}`); // 假设返回值是字符串
+                console.log(`[JNIEnv] GetStringUTFChars 返回: ${retval.readCString()}\n`); // 假设返回值是字符串
             }
         }
     });
 }
 
 Java.perform(() => {
-    hookJSONObject();
+    // hookJSONObject();
     // hookInputMethod();
     // hookOAID();
     // hookLIBC();

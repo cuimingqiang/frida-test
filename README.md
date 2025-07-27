@@ -1,3 +1,7 @@
+## frida 部署
+Frida 16.7.4
+frida-server-16.1.10-android-arm64
+
 ## 直接启动
 frida -U -f pkg -l 脚本.js -o 日子.txt
 
