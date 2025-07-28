@@ -504,7 +504,7 @@ function hookJNIMethod(method_name) {
         onEnter: function(args) {
             console.log(`\n[JNIEnv] 调用: ${method_name}`);
             if(method_name === "NewStringUTF") {
-                console.log(`  参数: ${args[1].readCString()}`); // 假设第一个参数是字符串
+                console.log(`参数: ${args[1].readCString()}`); // 假设第一个参数是字符串
             }
             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
                 .map(DebugSymbol.fromAddress)
@@ -518,10 +518,68 @@ function hookJNIMethod(method_name) {
     });
 }
 
+function hookUMeng() {
+    // Specify the target class
+    var targetClass = "com.umeng.commonsdk.internal.utils.h";
+    
+    // Enumerate all methods in the class
+    var hook = Java.use(targetClass);
+    
+    // Get all methods of the class
+    var methods = hook.class.getDeclaredMethods();
+    
+    // Hook each method
+    methods.forEach(function(method) {
+        var methodName = method.getName();
+        var overloads = hook[methodName].overloads;
+        
+        overloads.forEach(function(overload) {
+            // Get the parameter types for logging
+            var paramTypes = overload.argumentTypes.map(function(arg) {
+                return arg.className;
+            }).join(", ");
+            
+            overload.implementation = function() {
+                // Log method call with arguments
+                console.log("\n[+] Called: " + targetClass + "." + methodName + "(" + paramTypes + ")");
+                
+                // Print arguments if any
+                if (arguments.length > 0) {
+                    console.log("    Arguments:");
+                    for (var i = 0; i < arguments.length; i++) {
+                        console.log("        [" + i + "] " + arguments[i]);
+                    }
+                } else {
+                    console.log("    No arguments");
+                }
+                
+                // Print stack trace to see where it's called from
+                console.log("    Stack trace:");
+                console.log(Java.use("android.util.Log").getStackTraceString(
+                    Java.use("java.lang.Throwable").$new()
+                ));
+                
+                // Call the original method
+                var result = this[methodName].apply(this, arguments);
+                
+                // Log the return value
+                var returnType = overload.returnType.name;
+                console.log("    Return Type: " + returnType);
+                console.log("    Return Value: " + result);
+                
+                return result;
+            };
+        });
+    });
+    
+    console.log("[*] Successfully hooked all methods in " + targetClass);
+}
+
 Java.perform(() => {
     // hookJSONObject();
     // hookInputMethod();
     // hookOAID();
     // hookLIBC();
-    hookJNIEnv();
+    // hookJNIEnv();
+    hookUMeng();
 });

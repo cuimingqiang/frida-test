@@ -18,7 +18,7 @@ frida -U -f com.sytt.tzy -l game.js -o log3.txt
 objection -g com.jingdong.app.mall explore
 
             com.snapchat.android
- objection -g com.sytt.tzy explore
+objection -g com.sytt.tzy explore
 * 搜索某类的实例
 android heap search instances android.app.Dialog
 * 执行方法
@@ -37,6 +37,8 @@ org.json.JSONArray
 android hooking watch class com.example.app.Classname
 android hooking watch class android.view.inputmethod.InputMethodManager
 android hooking watch class android.view.inputmethod.InputMethodInfo
+android hooking watch class android.os.ServiceManager --dump-args -–dump-backtrace
+android hooking watch class android.content.pm.PackageManager --dump-args --dump-return -–dump-backtrace
 
 android hooking watch class_method android.content.Context.getSystemService --dump-args -–dump-backtrace
 * Hook 特定方法
@@ -49,10 +51,17 @@ android hooking watch class_method org.json.JSONObject.put --dump-args -–dump-
 
 android hooking watch class android.view.autofill.AutofillManager --dump-args -–dump-backtrace
 
+android hooking watch class_method android.os.ServiceManager.getService --dump-args --dump-return -–dump-backtrace
+android hooking watch class_method android.content.pm.PackageManager.getPackageInfoAsUserUncached --dump-args --dump-return -–dump-backtrace
+
+android hooking watch class_method android.os.SystemProperties.get --dump-args --dump-return -–dump-backtrace
+
+android hooking watch class_method android.os.Parcel.readString8 --dump-args --dump-return -–dump-backtrace
+android.content.pm.ApplicationInfo.
 ## 内存搜索
 
 memory search "simulator"  --string
-
+memory search "请联系客服"  --string
 
 * 取消观察
 android hooking unwatch class 
@@ -61,3 +70,42 @@ android hooking unwatch class_method
 # 方法1：使用 jobs 命令
 jobs list      # 列出所有活跃的 Hook
 jobs kill all  # 取消所有 Hook
+
+## 轻量级跟踪
+frida-trace -U -i "open" -F com.sytt.tzy
+* 多个
+frida-trace -U -i "open" -i "read" -i "write" -i "close" -F com.sytt.tzy
+frida-trace -U -i "__system_property_find" -F com.sytt.tzy
+  ``` c++
+  defineHandler({
+    onEnter(log, args, state) {
+      this.key = args[0].readCString();
+      // log('__system_property_find()',args[0].readCString());
+    },
+
+    onLeave(log, retval, state) {
+      log('__system_property_find kye=', this.key)
+      if(retval != null){
+          log('value=', (retval.add(4)).readCString())
+      }
+    }
+  });
+```
+frida-trace -U -i "stat*" -i "access*" -f com.sytt.tzy > trace.log
+frida-trace -U -i "memcpy" -f com.sytt.tzy > trace.log
+
+* 模糊匹配
+frida-trace -U -i "*file*" -i "*open*" -i "*read*" -i "*write*" -F com.sytt.tzy
+* 跟踪特定库
+frida-trace -U -n com.sytt.tzy -I "libc.so" -i "open" -i "fopen"
+* 跟踪JNI
+frida-trace -U -n com.sytt.tzy -i "Java_*"
+frida-trace -U -F com.sytt.tzy -i "com.unity3d.player.UnityPlayer_*"
+
+* 案列
+frida-trace -U \
+  -i "open" -i "read" -i "write" \
+  -i "malloc" -i "free" \
+  -i "socket" -i "connect" \
+  -F com.sytt.tzy \
+  -o multi_trace.log
