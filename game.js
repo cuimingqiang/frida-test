@@ -292,18 +292,6 @@ function hookRegisterNatives() {
     }
 }
 
-function hookAndroidDlopenExt() {
-    Interceptor.attach(Module.findExportByName(null, "android_dlopen_ext"), {
-        onEnter: function(args) {
-            var libname = args[0].readCString();
-            if(libname.startsWith("/data/app")) {
-                console.log("Loading lib:", libname);
-
-            }
-        }
-    });
-}
-
 function hookJSONObject(){
     const Exception = Java.use("java.lang.Exception");
     const JSONObject = Java.use("org.json.JSONObject");
@@ -330,7 +318,7 @@ function hookJSONObject(){
         // }else if (key === "simulator" || value === "simulator") {
         //     return this.put("", Integer.$new(0));
         // }
-        const stack = Exception.$new().getStackTrace();
+        // const stack = Exception.$new().getStackTrace();
         console.log("[*] JSONObject.put called with key: " + key + ", value: " + value);
         // stack.forEach((trace) => console.log(trace.toString()));
         return this.put(key, value);
@@ -506,9 +494,9 @@ function hookJNIMethod(method_name) {
             if(method_name === "NewStringUTF") {
                 console.log(`参数: ${args[1].readCString()}`); // 假设第一个参数是字符串
             }
-            const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
-                .map(DebugSymbol.fromAddress)
-            console.log(`调用栈:\n${stack}`);
+            // const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+            //     .map(DebugSymbol.fromAddress)
+            // console.log(`调用栈:\n${stack}`);
         },
         onLeave: function(retval) {
             if(method_name === "GetStringUTFChars") {
@@ -575,11 +563,380 @@ function hookUMeng() {
     console.log("[*] Successfully hooked all methods in " + targetClass);
 }
 
+function hookLibCore(){
+    let CharsetUtils = Java.use("libcore.util.CharsetUtils");
+    const Exception = Java.use("java.lang.Exception");
+    CharsetUtils.toUtf8Bytes.overload('java.lang.String', 'int', 'int').implementation = function(s, offset, length) {
+        console.log("[*] CharsetUtils.toUtf8Bytes called with name: " + s);
+        const stack = Exception.$new().getStackTrace();
+        stack.forEach((trace) => console.log(trace.toString()));
+        return this.toUtf8Bytes(s, offset, length);
+    }
+}
+
+function hookUnity() {
+    const libunity = Process.findModuleByName("libunity.so");
+    if (!libunity) {
+        console.log("[!] libunity.so not found, exiting hookUnity");
+        return;
+    }
+    console.log("[*] libunity.so found at base address: " + libunity.base);
+    // let sub_7AFF4 = libunity.base.add(0x7AFF4 + 1);
+    // Interceptor.attach(sub_7AFF4, {
+    //     onEnter: function(args) {
+    //         console.log(`sub_7AFF4 arg0 at ${args[0]}: ${args[0].readCString()}`);
+    //         // const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //         //     .map(DebugSymbol.fromAddress)
+    //         // console.log(`调用栈:\n${stack}`);
+    //     },
+    //     onLeave: function(retval) {
+            
+    //     }
+    // });
+    // let sub_100E96C = libunity.base.add(0x100E96C + 1);
+    // console.log(`sub_100E96C: ${sub_100E96C}`);
+    // if (sub_100E96C) {
+    //     Interceptor.attach(sub_100E96C, {
+    //         onEnter: function(args) {
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_100E96C调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //         }
+    //     });
+    // }
+    // let sub_100E968 = libunity.base.add(0x100E968 + 1);
+    // console.log(`sub_100E968: ${sub_100E968}`);
+    // if (sub_100E968) {
+    //     Interceptor.attach(sub_100E968, {
+    //         onEnter: function(args) {
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_100E968调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //         }
+    //     });
+    // } 
+    // let sub_173710 = libunity.base.add(0x173710 + 1);
+    // console.log(`sub_173710: ${sub_173710}`);
+    // if (sub_173710) {
+    //     Interceptor.attach(sub_173710, {
+    //         onEnter: function(args) {
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_173710调用栈:\n${stack}`);
+    //             let i = args[0].toUInt32();
+    //             console.log(`sub_173710 args0: ${i} ${ptr(i)}`);
+    //             console.log(`sub_173710 args1: ${args[1].readPointer().readCString()}`);
+    //             console.log(`sub_173710 args2: ${args[2].toInt32()}`);
+    //             console.log(`sub_173710 args3: ${args[3].toInt32()}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //         }
+    //     });
+    // }
+    let sub_7B04E = libunity.base.add(0x7B04E + 1);
+    console.log(`sub_7B04E: ${sub_7B04E}`);
+    if (sub_7B04E) {
+        Interceptor.attach(sub_7B04E, {
+            onEnter: function(args) {
+                let v = args[1].readCString();
+                if(v != null && v.includes("异常")) {
+                    const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+                        .map(DebugSymbol.fromAddress)
+                    console.log(`sub_7B04E调用栈:\n${stack}`);
+                    console.log(`sub_7B04E at ${args[1]}: args1: ${args[0].readCString()}`);
+                    console.log(`sub_7B04E at ${args[2]}: args2: ${args[1].readCString()}`);
+                    console.log(`sub_7B04E at ${args[3]}: args3: ${args[2].toInt32()}`);
+                }
+            },
+            onLeave: function(retval) {
+                // retval.replace(0); // 如果需要修改返回值，可以取消注释
+            }
+        });
+    }
+    // let sub_7B014 = libunity.base.add(0x7B014 + 1);
+    // console.log(`sub_7B014: ${sub_7B014}`);
+    // if (sub_7B014) {
+    //     Interceptor.attach(sub_7B014, {
+    //         onEnter: function(args) {
+    //             // console.log(`\n sub_7B014 args1: ${hexdump(args[0],{length:16})}`);
+    //             let str = args[1].readPointer().readCString();
+    //             if (str !== null && str.includes("当前设备异常")) {
+    //                 console.log(`\nsub_7B014 ${args[1].readPointer()} = args2: ${str}`);
+    //                 const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //                 console.log(`sub_7B014调用栈:\n${stack}`);
+    //             }
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //         }
+    //     });
+    // }
+    let sub_199698 = libunity.base.add(0x199698 + 1);
+    console.log(`sub_199698: ${sub_199698}`);
+    if (sub_199698) {
+        Interceptor.attach(sub_199698, {
+            onEnter: function(args) {
+                console.log(`\n sub_199698 args: ${hexdump(args[0],{length:64})}`);
+                let args0 = args[0].add(32).readPointer();
+                console.log(`sub_199698 args0 + 32: ${args0} = ${hexdump(args0,{length:64})}`);
+                let simulator = args0.add(28).readCString(4);
+                console.log(`sub_199698 args0 + 12: ${args0.add(28)} = ${simulator}`);
+                if (simulator === "S_MR") {
+                    const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+                        .map(DebugSymbol.fromAddress)
+                    console.log(`sub_199698调用栈:\n${stack}`);
+                }
+            },
+            onLeave: function(retval) {
+                // retval.replace(0); // 如果需要修改返回值，可以取消注释
+            }
+        });
+    }
+    // let sub_3E6970 = libunity.base.add(0x3E6970 + 1);
+    // console.log(`sub_3E6970: ${sub_3E6970}`);
+    // if (sub_3E6970) {
+    //     Interceptor.attach(sub_3E6970, {
+    //         onEnter: function(args) {
+    //             this.copy0 = args[0];
+    //             console.log(`sub_3E6970 args0: ${args[0].readPointer().readCString()} at ${args[0]} `);
+    //             console.log(`sub_3E6970 args1: ${args[1].readPointer().readCString()}`);
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_3E6970调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //             console.log(`sub_3E6970 ${this.copy0.readPointer()} = retval args0: ${this.copy0.readPointer().readCString()}`);
+    //         }
+    //     });
+    // }
+
+    // let sub_3ECCD0 = libunity.base.add(0x3ECCD0 + 1);
+    // console.log(`sub_3ECCD0: ${sub_3ECCD0}`);
+    // if (sub_3ECCD0) {
+    //     Interceptor.attach(sub_3ECCD0, {
+    //         onEnter: function(args) {
+    //             this.copy0 = args[0];
+    //             this.copy1 = args[1];
+    //             let p0 = args[0].readPointer();
+    //             const range = Process.findRangeByAddress(p0);
+    //             if (range) {
+    //                 console.log(`sub_3ECCD0 args0 at ${args[0]}: ${p0.readCString()}`);
+    //             }
+    //             console.log(`sub_3ECCD0 args1 at ${args[1]}: ${hexdump(args[1], {length: 64})}`);
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_3ECCD0 调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //             console.log(`sub_3ECCD0 retval args0 at ${this.copy0.readPointer()} : ${this.copy0.readPointer().readCString()}`);
+    //             console.log(`sub_3ECCD0 retval args1 at ${this.copy1} : ${hexdump(this.copy1, {length: 64})}`);
+    //         }
+    //     });
+    // }
+    // let sub_3906FC = libunity.base.add(0x3906FC + 1);
+    // console.log(`sub_3906FC: ${sub_3906FC}`);
+    // if (sub_3906FC) {
+    //     Interceptor.attach(sub_3906FC, {
+    //         onEnter: function(args) {
+    //             this.copy0 = args[0];
+    //             this.copy1 = args[1];
+    //             this.copy2 = args[2].toInt32();
+    //             console.log(`sub_3906FC args0 at ${args[0]}: ${args[0].readCString()}`);
+    //             console.log(`sub_3906FC args1 at ${args[1]}: ${hexdump(args[1], {length: 16})}`);
+    //             console.log(`sub_3906FC args2 at ${args[2]}: ${args[2].toInt32()}`);
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`sub_3906FC 调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //             console.log(`sub_3906FC retval : ${retval.toInt32()}`);
+    //             console.log(`sub_3906FC retval args0 at ${this.copy0} : ${hexdump(this.copy0, {length: this.copy2})}`);
+    //         }
+    //     });
+    // }
+    // let off_FF1AFC = libunity.base.add(0xFF1AFC + 1);
+    // console.log(`off_FF1AFC: ${off_FF1AFC}`);
+    // if (off_FF1AFC) {
+    //     Interceptor.attach(off_FF1AFC, {
+    //         onEnter: function(args) {
+    //             this.copy0 = args[0];
+    //             this.copy1 = args[1];
+    //             console.log(`off_FF1AFC args0 at ${args[0]}: ${args[0].readCString()}`);
+    //             const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+    //                 .map(DebugSymbol.fromAddress)
+    //             console.log(`off_FF1AFC 调用栈:\n${stack}`);
+    //         },
+    //         onLeave: function(retval) {
+    //             // retval.replace(0); // 如果需要修改返回值，可以取消注释
+    //             console.log(`off_FF1AFC retval : ${retval.readCString()}`);
+    //         }
+    //     });
+    // }
+}
+
+
+function hookSLua() {
+    const libslua = Process.findModuleByName("libslua.so");
+    if (!libslua) {
+        console.log("[!] libslua.so not found, exiting hookSLua");
+        return;
+    }
+    console.log("[*] libslua.so found at base address: " + libslua.base);
+    
+    const lua_call = Module.findExportByName("libslua.so", "lua_call");
+    if (lua_call) {
+        Interceptor.attach(lua_call, {
+            onEnter: function (args) {
+                const L = args[0];
+                const nargs = args[1].toInt32();
+                const nresults = args[2].toInt32();
+                const idx = -nargs - 1;
+                // 检查是否调用了目标函数
+                const lua_typename = Module.findExportByName("libslua.so", "lua_typename");
+                const lua_type = Module.findExportByName("libslua.so", "lua_type");
+                const type = new NativeFunction(lua_type, "int", ["pointer", "int"])(L, -3);
+                const funcName = new NativeFunction(lua_typename, "pointer", ["pointer", "int"])(L, type).readCString();
+                console.log(`\n[lua_call] Called function: ${funcName}, nargs: ${nargs}, nresults: ${nresults}`);
+                if (funcName.includes("RequestCharactersInTexture")) {
+                    console.log("Lua called RequestCharactersInTexture!");
+                }
+            }
+        });
+    } else {
+        console.log("[!] lua_call not found in liblua.so");
+    }
+    obj
+}
+
+function hookSYZ(){
+    let libcheckrisknative = Process.findModuleByName("libcheckrisknative.so");
+    if (!libcheckrisknative) {
+        console.log("[!] libcheckrisknative.so not found, exiting hookSYZ");
+        return;
+    }
+    console.log("[*] libcheckrisknative.so found at base address: " + libcheckrisknative.base);
+    let sub_2FE5C = libcheckrisknative.base.add(0x2FE5C );
+    console.log(`sub_2FE5C: ${sub_2FE5C}`);
+    if (sub_2FE5C) {
+        Interceptor.attach(sub_2FE5C, {
+            onEnter: function(args) {
+                console.log(`\n sub_2FE5C args0: ${args[0].readCString()}`);
+                const stack = Thread.backtrace(this.context, Backtracer.ACCURATE)
+                    .map(DebugSymbol.fromAddress)
+                console.log(`sub_2FE5C调用栈:\n${stack}`);
+            },
+            onLeave: function(retval) {
+                // retval.replace(0); // 如果需要修改返回值，可以取消注释
+                console.log(`sub_2FE5C retval: ${retval.readCString()}`);
+            }
+        });
+    }
+    let sub_2E11C = libcheckrisknative.base.add(0x2E11C );
+    console.log(`sub_2E11C: ${sub_2E11C}`);
+    if (sub_2E11C) {
+        Interceptor.attach(sub_2E11C, {
+            onEnter: function(args) {
+                console.log(`\n sub_2E11C args0 at ${args[0]}: ${hexdump(args[0], {length: 64})}`);
+                console.log(`\n sub_2E11C args1 at ${args[1]}: ${hexdump(args[1], {length: 64})}`);
+               
+            },
+            onLeave: function(retval) {
+                // retval.replace(0); // 如果需要修改返回值，可以取消注释
+                console.log(`sub_2E11C retval at ${retval}: ${hexdump(retval, {length: 64})}`);
+            }
+        });
+    }
+}
+
+function hookAndroidDlopenExt(){
+    const android_dlopen_ext = Module.findExportByName("libc.so", "android_dlopen_ext");
+    if (android_dlopen_ext) {
+        Interceptor.attach(android_dlopen_ext, {
+            onEnter: function(args) {
+                this.libname = args[0].readCString();
+                // console.log(`\n[+] android_dlopen_ext called with libname: ${libname}`);
+                // if (libname && libname.includes("libunity.so")) {
+                //     console.log(`[+] 检测到 libunity.so 加载请求`);
+                //     // 启动监控
+                //     hookUnity();
+                // }
+               
+            },
+            onLeave: function(retval) {
+                if (retval.isNull()) {
+                    // console.log(`[!] android_dlopen_ext failed to load: ${this.libname}`);
+                } else {
+                    // console.log(`[+] android_dlopen_ext successfully loaded: ${this.libname} at ${retval}`);
+                    if (this.libname && this.libname.includes("libcheckrisknative.so")) {
+                        console.log(`[+] 检测到 libunity.so 加载请求`);
+                        // 启动监控
+                        hookSYZ();
+                    }
+                    // if (this.libname && this.libname.includes("libslua.so")) {
+                    //     console.log(`[+] 检测到 liblua.so 加载请求`);
+                    //     // 启动监控
+                    //     hookSLua();
+                    // }
+                }
+            }
+        });
+    }
+    Interceptor.attach(Module.findExportByName("libdl.so", "dlopen"), {
+        onEnter: function(args) {
+            this.libname = args[0].readCString();
+            this.flags = args[1].toInt32();
+            // console.log(`dlopen called: ${this.libname}, flags: 0x${this.flags.toString(16)}`);
+        },
+        onLeave: function(retval) {
+            if (retval.isNull()) {
+                // console.log(`dlopen failed to load: ${this.libname}`);
+            } else {
+                // console.log(`dlopen successfully loaded: ${this.libname} at ${retval}`);
+                if (this.libname && this.libname.includes("libcheckrisknative.so")) {
+                    console.log(`[+] 检测到 libunity.so 加载请求`);
+                    // 启动监控
+                    hookSYZ();
+                }
+                // if (this.libname && this.libname.includes("libslua.so")) {
+                //     console.log(`[+] dlopen 检测到 libslua.so 加载请求`);
+                //     // 启动监控
+                //     // hookUnity();
+                //     hookSLua();
+                // }
+            }
+        }
+    }); 
+    // hookUnity();
+}
+
+function hookMap(){
+    let HashMap = Java.use("java.util.HashMap");
+    HashMap.put.overload('java.lang.Object', 'java.lang.Object').implementation = function(key, value) {
+        console.log("[*] HashMap.put called with key: " + key + ", value: " + value);
+        // 可以在这里添加对特定键值对的处理逻辑
+        return this.put(key, value);
+    };
+}
+
 Java.perform(() => {
     // hookJSONObject();
     // hookInputMethod();
     // hookOAID();
     // hookLIBC();
     // hookJNIEnv();
-    hookUMeng();
+    // hookUMeng();
+    // hookLibCore();
+    hookAndroidDlopenExt();
+    // hookMap();
 });
